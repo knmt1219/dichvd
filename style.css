@@ -1,0 +1,269 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+:root {
+  --bg-main: #0B0F17;
+  --bg-surface: #111827;
+  --bg-surface-elevated: #1F293D;
+  --bg-card: rgba(17, 24, 39, 0.85);
+  --border-color: rgba(255, 255, 255, 0.08);
+  --border-highlight: rgba(99, 102, 241, 0.3);
+  --primary: #6366F1;
+  --primary-hover: #4F46E5;
+  --primary-glow: rgba(99, 102, 241, 0.25);
+  --accent-cyan: #06B6D4;
+  --accent-emerald: #10B981;
+  --text-main: #F9FAFB;
+  --text-muted: #9CA3AF;
+  --text-dim: #6B7280;
+}
+
+* {
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  box-sizing: border-box;
+}
+
+code, pre, .font-mono {
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: rgba(15, 23, 42, 0.6);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(75, 85, 99, 0.5);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(99, 102, 241, 0.6);
+}
+
+/* Glassmorphism & UI Accents */
+.glass-panel {
+  background: var(--bg-card);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--border-color);
+}
+
+.glass-panel-elevated {
+  background: rgba(30, 41, 59, 0.7);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.glow-primary {
+  box-shadow: 0 0 25px -5px var(--primary-glow);
+}
+
+.glow-cyan {
+  box-shadow: 0 0 25px -5px rgba(6, 182, 212, 0.3);
+}
+
+/* Studio Video Container */
+.video-wrapper {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: #000;
+  border-radius: 0.75rem;
+  overflow: hidden;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+}
+
+/* Dynamic Subtitle Overlay */
+#subtitle-overlay-container {
+  position: absolute;
+  left: 0;
+  right: 0;
+  pointer-events: none;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  padding: 0 1.5rem;
+  z-index: 30;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Subtitle positions */
+.sub-pos-bottom {
+  bottom: 8%;
+  top: auto;
+}
+.sub-pos-bottom-higher {
+  bottom: 18%;
+  top: auto;
+}
+.sub-pos-middle {
+  top: 50%;
+  transform: translateY(-50%);
+  bottom: auto;
+}
+.sub-pos-top {
+  top: 8%;
+  bottom: auto;
+}
+
+.subtitle-box {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  max-width: 90%;
+  padding: 0.5rem 1.25rem;
+  border-radius: 0.5rem;
+  line-height: 1.4;
+  word-break: break-word;
+  transition: transform 0.15s ease, opacity 0.15s ease;
+  animation: subtitlePop 0.18s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+@keyframes subtitlePop {
+  0% {
+    opacity: 0;
+    transform: scale(0.96) translateY(4px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.subtitle-original-text {
+  font-size: 0.75em;
+  opacity: 0.85;
+  margin-bottom: 0.2rem;
+  font-weight: 500;
+}
+
+.subtitle-translated-text {
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+/* Timeline scrubber track */
+.timeline-track-segment {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  border-radius: 4px;
+  background: rgba(99, 102, 241, 0.4);
+  border: 1px solid rgba(99, 102, 241, 0.8);
+  cursor: pointer;
+  transition: background 0.15s, transform 0.15s;
+}
+
+.timeline-track-segment:hover {
+  background: rgba(99, 102, 241, 0.7);
+  transform: scaleY(1.15);
+  z-index: 10;
+}
+
+.timeline-track-segment.active-segment {
+  background: rgba(6, 182, 212, 0.8);
+  border-color: #38BDF8;
+  box-shadow: 0 0 10px rgba(6, 182, 212, 0.5);
+  z-index: 15;
+}
+
+/* Audio Ducking Pulse Animation */
+.ducking-indicator {
+  transition: all 0.3s ease;
+}
+
+.ducking-indicator.ducking-active {
+  background-color: rgba(239, 68, 68, 0.2);
+  border-color: #EF4444;
+  color: #F87171;
+  animation: duckingPulse 1.2s infinite alternate;
+}
+
+@keyframes duckingPulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4);
+  }
+  100% {
+    box-shadow: 0 0 0 8px rgba(239, 68, 68, 0);
+  }
+}
+
+/* Segment Card in Editor */
+.segment-card {
+  transition: all 0.2s ease;
+  border-left: 3px solid transparent;
+}
+
+.segment-card:hover {
+  border-left-color: var(--primary);
+  background: rgba(30, 41, 59, 0.8);
+}
+
+.segment-card.active-playback {
+  border-left-color: var(--accent-cyan);
+  background: rgba(6, 182, 212, 0.1);
+  box-shadow: 0 0 15px -3px rgba(6, 182, 212, 0.2);
+}
+
+/* Dropzone hover states */
+.dropzone.dragover {
+  border-color: #6366F1 !important;
+  background: rgba(99, 102, 241, 0.1) !important;
+}
+
+/* Step badges */
+.step-item.active .step-number {
+  background: #6366F1;
+  color: white;
+  box-shadow: 0 0 15px rgba(99, 102, 241, 0.5);
+}
+
+.step-item.completed .step-number {
+  background: #10B981;
+  color: white;
+}
+
+/* Toast styling */
+#toast-container {
+  position: fixed;
+  bottom: 1.5rem;
+  right: 1.5rem;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  pointer-events: none;
+}
+
+.toast {
+  pointer-events: auto;
+  min-width: 280px;
+  max-width: 420px;
+  padding: 0.875rem 1.25rem;
+  border-radius: 0.75rem;
+  color: white;
+  background: #1F2937;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.875rem;
+  animation: slideInToast 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: opacity 0.2s, transform 0.2s;
+}
+
+@keyframes slideInToast {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}

@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="vi" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Studio Dub & Sub — Video Dubbing & Subtitle Generator</title>
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#EEF2FF',
+              500: '#6366F1',
+              600: '#4F46E5',
+              700: '#4338CA',
+            },
+            studio: {
+              bg: '#0B0F17',
+              surface: '#111827',
+              elevated: '#1E293B',
+              border: 'rgba(255, 255, 255, 0.08)'
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Custom CSS -->
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="bg-[#0B0F17] text-slate-100 min-h-screen flex flex-col antialiased selection:bg-indigo-500 selection:text-white">
+
+  <!-- ================================================================= -->
+  <!-- TOP HEADER NAV                                                    -->
+  <!-- ================================================================= -->
+  <header class="border-b border-white/10 bg-slate-900/80 backdrop-blur-md sticky top-0 z-50">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      
+      <!-- Brand Logo -->
+      <div class="flex items-center space-x-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-cyan-400 flex items-center justify-center shadow-lg shadow-indigo-500/25">
+          <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 100-6 3 3 0 000 6z"></path>
+          </svg>
+        </div>
+        <div>
+          <h1 class="text-lg font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white via-slate-200 to-indigo-300">
+            AI Studio <span class="text-indigo-400 font-semibold">Dub &amp; Sub</span>
+          </h1>
+          <p class="text-[11px] text-slate-400 font-medium">Video Dubbing &amp; Subtitle Generator powered by Gemini</p>
+        </div>
+      </div>
+
+      <!-- Header Actions -->
+      <div class="flex items-center space-x-3">
+        <button id="btn-load-demo" class="px-3.5 py-1.5 rounded-lg text-xs font-semibold text-cyan-300 bg-cyan-950/60 border border-cyan-700/50 hover:bg-cyan-900/60 transition flex items-center gap-1.5 shadow-sm">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+          </svg>
+          Dùng Video Mẫu Demo
+        </button>
+
+        <label for="video-file-input" class="px-3.5 py-1.5 rounded-lg text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-500 cursor-pointer transition flex items-center gap-1.5 shadow-md shadow-indigo-600/30">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path>
+          </svg>
+          Tải Video Lên
+        </label>
+        <input type="file" id="video-file-input" accept="video/mp4,video/webm,video/quicktime" class="hidden">
+      </div>
+
+    </div>
+  </header>
+
+  <!-- ================================================================= -->
+  <!-- STEP PROGRESS BAR                                                 -->
+  <!-- ================================================================= -->
+  <div class="bg-slate-900/50 border-b border-white/5 py-2.5 px-4">
+    <div class="max-w-7xl mx-auto flex items-center justify-between text-xs font-medium text-slate-400">
+      
+      <div class="flex items-center gap-2 step-item active" data-step="1">
+        <span class="step-number w-5 h-5 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-[11px] font-bold">1</span>
+        <span>Tải Video</span>
+      </div>
+
+      <div class="h-0.5 w-8 sm:w-16 bg-slate-800"></div>
+
+      <div class="flex items-center gap-2 step-item" data-step="2">
+        <span class="step-number w-5 h-5 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-[11px] font-bold">2</span>
+        <span>AI Bóc Băng &amp; Dịch</span>
+      </div>
+
+      <div class="h-0.5 w-8 sm:w-16 bg-slate-800"></div>
+
+      <div class="flex items-center gap-2 step-item" data-step="3">
+        <span class="step-number w-5 h-5 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-[11px] font-bold">3</span>
+        <span>Lồng Tiếng &amp; Tinh Chỉnh</span>
+      </div>
+
+      <div class="h-0.5 w-8 sm:w-16 bg-slate-800"></div>
+
+      <div class="flex items-center gap-2 step-item" data-step="4">
+        <span class="step-number w-5 h-5 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-[11px] font-bold">4</span>
+        <span>Xuất File SRT / VTT</span>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ================================================================= -->
+  <!-- MAIN STUDIO LAYOUT (2 COLUMNS)                                    -->
+  <!-- ================================================================= -->
+  <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+    
+    <!-- =============================================================== -->
+    <!-- LEFT COLUMN: VIDEO PLAYER & SUBTITLE OVERLAY & TIMELINE TRACK    -->
+    <!-- =============================================================== -->
+    <div class="lg:col-span-7 flex flex-col space-y-4">
+      
+      <!-- Video Container -->
+      <div id="video-wrapper" class="video-wrapper relative group bg-black border border-white/10 rounded-2xl overflow-hidden flex items-center justify-center">
+        
+        <!-- Video Element -->
+        <video id="studio-video" class="w-full h-full object-contain hidden" playsinline controls preload="metadata"></video>
+
+        <!-- Subtitle Overlay Container -->
+        <div id="subtitle-overlay-container" class="sub-pos-bottom pointer-events-none"></div>
+
+        <!-- Audio Ducking Floating Indicator Badge -->
+        <div id="ducking-indicator-badge" class="absolute top-4 left-4 z-40 hidden items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold text-rose-300 bg-rose-950/80 border border-rose-600/60 shadow-lg backdrop-blur-md">
+          <span class="w-2 h-2 rounded-full bg-rose-500 animate-ping"></span>
+          <span>🎙️ Ducking: Giảm âm video</span>
+        </div>
+
+        <!-- Empty Placeholder / Dropzone -->
+        <div id="empty-video-placeholder" class="dropzone absolute inset-0 flex flex-col items-center justify-center p-6 text-center border-2 border-dashed border-slate-700 hover:border-indigo-500 rounded-2xl transition-all cursor-pointer bg-slate-900/40">
+          <div class="w-16 h-16 rounded-2xl bg-indigo-950/60 border border-indigo-700/40 flex items-center justify-center mb-3 text-indigo-400">
+            <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+            </svg>
+          </div>
+          <h3 class="text-base font-semibold text-slate-200">Kéo &amp; thả video vào đây</h3>
+          <p class="text-xs text-slate-400 mt-1 max-w-sm">Hỗ trợ các định dạng .mp4, .webm. Hoặc nhấn nút <strong>Dùng Video Mẫu Demo</strong> ở thanh trên để kiểm thử ngay.</p>
+          <button onclick="document.getElementById('video-file-input').click()" class="mt-4 px-4 py-2 rounded-lg text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-500 transition shadow-lg shadow-indigo-600/30">
+            Chọn tệp từ máy tính
+          </button>
+        </div>
+
+      </div>
+
+      <!-- Video Timeline Bar & Scrubber Track -->
+      <div class="glass-panel rounded-xl p-3.5 space-y-2">
+        <div class="flex items-center justify-between text-xs font-mono text-slate-400">
+          <div class="flex items-center gap-2">
+            <span class="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span class="text-slate-300 font-semibold">Timeline Phụ Đề</span>
+          </div>
+          <div class="flex items-center gap-1 text-slate-300">
+            <span id="current-time-display">00:00</span>
+            <span class="text-slate-600">/</span>
+            <span id="total-duration-display">00:00</span>
+          </div>
+        </div>
+
+        <!-- Timeline Segment Visual Track -->
+        <div class="relative w-full h-8 bg-slate-900/90 rounded-lg border border-slate-800 overflow-hidden" id="timeline-track-wrapper">
+          <div id="timeline-segments-track" class="relative w-full h-full">
+            <!-- Dynamic subtitle segment blocks will be injected here -->
+          </div>
+        </div>
+
+        <p class="text-[11px] text-slate-500 italic">
+          💡 Mẹo: Nhấp vào từng khối màu trên thanh timeline để tua nhanh video đến đúng câu thoại tương ứng.
+        </p>
+      </div>
+
+    </div>
+
+    <!-- =============================================================== -->
+    <!-- RIGHT COLUMN: STUDIO CONTROL PANEL (TABS)                       -->
+    <!-- =============================================================== -->
+    <div class="lg:col-span-5 flex flex-col space-y-4">
+      
+      <!-- Studio Tabs Navigation -->
+      <div class="flex border-b border-slate-800 bg-slate-900/80 rounded-t-xl overflow-x-auto text-xs font-semibold">
+        <button data-tab="tab-ai" class="tab-btn flex-1 py-3 px-3 border-b-2 border-indigo-500 text-indigo-400 bg-slate-800/60 flex items-center justify-center gap-1.5 transition whitespace-nowrap">
+          <span>⚡</span> AI Bóc Băng
+        </button>
+        <button data-tab="tab-dubbing" class="tab-btn flex-1 py-3 px-3 border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center justify-center gap-1.5 transition whitespace-nowrap">
+          <span>🎙️</span> Lồng Tiếng
+        </button>
+        <button data-tab="tab-styles" class="tab-btn flex-1 py-3 px-3 border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center justify-center gap-1.5 transition whitespace-nowrap">
+          <span>🎨</span> Kiểu Chữ
+        </button>
+        <button data-tab="tab-editor" class="tab-btn flex-1 py-3 px-3 border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center justify-center gap-1.5 transition whitespace-nowrap">
+          <span>📝</span> Thoại (<span id="segment-count-badge">0</span>)
+        </button>
+      </div>
+
+      <!-- Studio Tab Contents -->
+      <div class="glass-panel rounded-b-xl p-4 flex-1 flex flex-col justify-between space-y-4">
+        
+        <!-- ============================================================= -->
+        <!-- TAB 1: AI BÓC BĂNG & DỊCH THUẬT                               -->
+        <!-- ============================================================= -->
+        <div id="tab-ai" class="tab-pane space-y-4">
+          
+          <!-- Gemini API Key Section -->
+          <div class="space-y-1.5">
+            <div class="flex items-center justify-between">
+              <label class="text-xs font-semibold text-slate-300">Google Gemini API Key:</label>
+              <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" class="text-[11px] text-indigo-400 hover:underline flex items-center gap-0.5">
+                Lấy Key miễn phí ↗
+              </a>
+            </div>
+            <div class="flex gap-2">
+              <div class="relative flex-1">
+                <input type="password" id="gemini-api-key-input" placeholder="AIzaSy..." class="w-full bg-slate-900/90 border border-slate-700/80 rounded-lg px-3 py-2 text-xs font-mono text-white placeholder-slate-600 focus:outline-none focus:border-indigo-500 transition">
+                <button type="button" id="btn-toggle-key-visibility" class="absolute right-2.5 top-2 text-slate-400 hover:text-white text-xs" title="Ẩn/Hiện Key">
+                  👁️
+                </button>
+              </div>
+              <button id="btn-save-key" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-xs font-semibold rounded-lg text-slate-200 border border-slate-700 transition">
+                Lưu
+              </button>
+            </div>
+            <p class="text-[10px] text-slate-500">API Key được lưu an toàn cục bộ trong trình duyệt (localStorage).</p>
+          </div>
+
+          <!-- Model & Language Options -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            
+            <div class="space-y-1">
+              <label class="text-xs font-semibold text-slate-300">Mô hình Gemini:</label>
+              <select id="gemini-model-select" class="w-full bg-slate-900/90 border border-slate-700/80 rounded-lg px-2.5 py-2 text-xs text-white focus:outline-none focus:border-indigo-500">
+                <option value="gemini-2.0-flash">Gemini 2.0 Flash (Khuyên dùng)</option>
+                <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
+                <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
+                <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
+              </select>
+            </div>
+
+            <div class="space-y-1">
+              <label class="text-xs font-semibold text-slate-300">Ngôn ngữ dịch đích:</label>
+              <select id="target-language-select" class="w-full bg-slate-900/90 border border-slate-700/80 rounded-lg px-2.5 py-2 text-xs text-white focus:outline-none focus:border-indigo-500">
+                <option value="Tiếng Việt" selected>Tiếng Việt (Vietnamese)</option>
+                <option value="English">English (US)</option>
+                <option value="Tiếng Nhật (Japanese)">Tiếng Nhật (Japanese)</option>
+                <option value="Tiếng Hàn (Korean)">Tiếng Hàn (Korean)</option>
+                <option value="Tiếng Trung (Chinese)">Tiếng Trung (Chinese)</option>
+                <option value="Tiếng Pháp (French)">Tiếng Pháp (French)</option>
+                <option value="Tiếng Đức (German)">Tiếng Đức (German)</option>
+                <option value="Tiếng Tây Ban Nha (Spanish)">Tiếng Tây Ban Nha (Spanish)</option>
+                <option value="Tiếng Nga (Russian)">Tiếng Nga (Russian)</option>
+                <option value="Tiếng Thái (Thai)">Tiếng Thái (Thai)</option>
+              </select>
+            </div>
+
+          </div>
+
+          <!-- Custom Prompt Directive -->
+          <div class="space-y-1">
+            <label class="text-xs font-semibold text-slate-300">Chỉ dẫn dịch thuật bổ sung (Tùy chọn):</label>
+            <textarea id="custom-prompt-input" rows="2" placeholder="Ví dụ: Dịch phong cách tự nhiên, gần gũi, dùng đại từ xưng hô phù hợp cho video review công nghệ..." class="w-full bg-slate-900/90 border border-slate-700/80 rounded-lg p-2 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-indigo-500 resize-none"></textarea>
+          </div>
+
+          <!-- AI Progress & Status Box (Hidden by default) -->
+          <div id="ai-status-container" class="hidden p-3 rounded-lg bg-indigo-950/40 border border-indigo-800/40 space-y-2">
+            <div class="flex items-center justify-between text-xs text-indigo-300 font-medium">
+              <span id="ai-status-text">Đang chuẩn bị dữ liệu...</span>
+              <span class="animate-spin text-indigo-400">⏳</span>
+            </div>
+            <div class="w-full bg-slate-800 rounded-full h-2 overflow-hidden">
+              <div id="ai-progress-bar" class="bg-gradient-to-r from-indigo-500 to-cyan-400 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+            </div>
+          </div>
+
+          <!-- Action Buttons -->
+          <div class="space-y-2 pt-2">
+            <button id="btn-start-ai" class="w-full py-2.5 rounded-xl font-bold text-xs sm:text-sm text-white bg-gradient-to-r from-indigo-600 via-indigo-500 to-indigo-600 hover:from-indigo-500 hover:to-indigo-500 shadow-lg shadow-indigo-600/30 transition flex items-center justify-center gap-2">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+              </svg>
+              Bắt Đầu Bóc Băng &amp; Dịch Thuật
+            </button>
+
+            <button id="btn-use-demo-data" type="button" class="w-full py-2 rounded-lg text-xs font-semibold text-slate-300 bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 transition">
+              ⚡ Nạp Dữ Liệu Phụ Đề Demo (Không Cần Gọi API)
+            </button>
+          </div>
+
+        </div>
+
+        <!-- ============================================================= -->
+        <!-- TAB 2: CÀI ĐẶT LỒNG TIẾNG (DUBBING & AUDIO DUCKING)           -->
+        <!-- ============================================================= -->
+        <div id="tab-dubbing" class="tab-pane hidden space-y-4">
+          
+          <!-- Master Dubbing Toggle -->
+          <div class="flex items-center justify-between p-3 rounded-xl bg-slate-900/80 border border-slate-800">
+            <div>
+              <span class="text-xs font-bold text-white block">Thuyết Minh Tự Động (AI Voiceover)</span>
+              <span class="text-[11px] text-slate-400">Tự động phát giọng đọc khi video chạy đến mốc thời gian</span>
+            </div>
+            <label class="relative inline-flex items-center cursor-pointer">
+              <input type="checkbox" id="dubbing-enable-toggle" checked class="sr-only peer">
+              <div class="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+            </label>
+          </div>
+
+          <!-- Audio Ducking Setting -->
+          <div class="p-3 rounded-xl bg-slate-900/80 border border-slate-800 space-y-2.5">
+            <div class="flex items-center justify-between">
+              <div>
+                <span class="text-xs font-bold text-white block">Hạ Âm Video Gốc (Audio Ducking)</span>
+                <span class="text-[11px] text-slate-400">Tự giảm âm lượng video khi giọng đọc vang lên</span>
+              </div>
+              <label class="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" id="ducking-enable-toggle" checked class="sr-only peer">
+                <div class="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+              </label>
+            </div>
+
+            <div class="pt-1">
+              <div class="flex justify-between text-xs text-slate-400 mb-1">
+                <span>Âm lượng video gốc khi hạ (Ducking Level):</span>
+                <span id="ducking-ratio-val" class="font-mono font-bold text-indigo-400">25%</span>
+              </div>
+              <input type="range" id="ducking-ratio-slider" min="0.0" max="0.8" step="0.05" value="0.25" class="w-full accent-indigo-500">
+            </div>
+          </div>
+
+          <!-- Voice Selection -->
+          <div class="space-y-1.5">
+            <label class="text-xs font-semibold text-slate-300">Giọng đọc trình duyệt (Web Speech API):</label>
+            <select id="voice-select" class="w-full bg-slate-900/90 border border-slate-700/80 rounded-lg px-2.5 py-2 text-xs text-white focus:outline-none focus:border-indigo-500"></select>
+          </div>
+
+          <!-- Volumes & Rates -->
+          <div class="grid grid-cols-2 gap-3">
+            <div class="space-y-1">
+              <label class="text-xs text-slate-400">Âm lượng Thuyết Minh:</label>
+              <input type="range" id="voice-volume-slider" min="0.0" max="1.0" step="0.05" value="1.0" class="w-full accent-indigo-500">
+            </div>
+            <div class="space-y-1">
+              <label class="text-xs text-slate-400">Âm lượng Video Gốc:</label>
+              <input type="range" id="original-volume-slider" min="0.0" max="1.0" step="0.05" value="1.0" class="w-full accent-indigo-500">
+            </div>
+          </div>
+
+          <!-- Playback Rate & Pitch -->
+          <div class="space-y-1.5">
+            <div class="flex justify-between text-xs text-slate-400">
+              <span>Tốc độ đọc (Speech Rate):</span>
+              <span id="voice-rate-val" class="font-mono font-bold text-cyan-400">1.0x</span>
+            </div>
+            <input type="range" id="voice-rate-slider" min="0.6" max="1.8" step="0.1" value="1.0" class="w-full accent-cyan-500">
+          </div>
+
+          <button id="btn-test-voice" class="w-full py-2 rounded-lg text-xs font-semibold text-cyan-300 bg-cyan-950/60 border border-cyan-700/50 hover:bg-cyan-900/60 transition flex items-center justify-center gap-1.5">
+            <span>🔊</span> Nghe Thử Giọng Đọc Đã Chọn
+          </button>
+
+        </div>
+
+        <!-- ============================================================= -->
+        <!-- TAB 3: TÙY BIẾN KIỂU DÁNG PHỤ ĐỀ (SUBTITLE STYLES)            -->
+        <!-- ============================================================= -->
+        <div id="tab-styles" class="tab-pane hidden space-y-4">
+          
+          <!-- Vị trí phụ đề -->
+          <div class="space-y-1.5">
+            <label class="text-xs font-semibold text-slate-300">Vị trí hiển thị phụ đề:</label>
+            <div class="grid grid-cols-4 gap-2 text-xs">
+              <button data-pos="bottom" class="sub-pos-btn py-1.5 px-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-200 ring-2 ring-indigo-500 bg-indigo-600/30">Dưới đáy</button>
+              <button data-pos="bottom-higher" class="sub-pos-btn py-1.5 px-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-200">Cách đáy</button>
+              <button data-pos="middle" class="sub-pos-btn py-1.5 px-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-200">Ở giữa</button>
+              <button data-pos="top" class="sub-pos-btn py-1.5 px-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-200">Trên đỉnh</button>
+            </div>
+          </div>
+
+          <!-- Chế độ hiển thị -->
+          <div class="space-y-1.5">
+            <label class="text-xs font-semibold text-slate-300">Chế độ hiển thị chữ:</label>
+            <select id="sub-display-mode" class="w-full bg-slate-900/90 border border-slate-700/80 rounded-lg px-2.5 py-2 text-xs text-white focus:outline-none focus:border-indigo-500">
+              <option value="both">Song ngữ (Dòng dịch nổi bật + dòng gốc)</option>
+              <option value="translated-only">Chỉ hiển thị dòng đã dịch</option>
+              <option value="original-only">Chỉ hiển thị dòng gốc</option>
+            </select>
+          </div>
+
+          <!-- Font Size Slider -->
+          <div class="space-y-1">
+            <div class="flex justify-between text-xs text-slate-400">
+              <span>Cỡ chữ phụ đề (Font Size):</span>
+              <span id="sub-font-size-val" class="font-mono font-bold text-indigo-400">22px</span>
+            </div>
+            <input type="range" id="sub-font-size" min="14" max="42" step="2" value="22" class="w-full accent-indigo-500">
+          </div>
+
+          <!-- Text Color & Presets -->
+          <div class="space-y-1.5">
+            <label class="text-xs font-semibold text-slate-300">Màu chữ:</label>
+            <div class="flex items-center gap-3">
+              <input type="color" id="sub-text-color" value="#FFFFFF" class="w-8 h-8 rounded border-0 cursor-pointer bg-transparent">
+              <div class="flex gap-2">
+                <button type="button" class="color-preset-btn w-6 h-6 rounded-full bg-white border border-slate-600" data-color="#FFFFFF" title="Trắng"></button>
+                <button type="button" class="color-preset-btn w-6 h-6 rounded-full bg-yellow-400 border border-slate-600" data-color="#FACC15" title="Vàng"></button>
+                <button type="button" class="color-preset-btn w-6 h-6 rounded-full bg-cyan-400 border border-slate-600" data-color="#38BDF8" title="Cyan"></button>
+                <button type="button" class="color-preset-btn w-6 h-6 rounded-full bg-emerald-400 border border-slate-600" data-color="#34D399" title="Xanh lá"></button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Background Opacity & Blur -->
+          <div class="grid grid-cols-2 gap-3">
+            <div class="space-y-1">
+              <label class="text-xs text-slate-400">Độ tối khung nền:</label>
+              <input type="range" id="sub-bg-opacity" min="0.0" max="1.0" step="0.1" value="0.75" class="w-full accent-indigo-500">
+            </div>
+            <div class="space-y-1">
+              <label class="text-xs text-slate-400">Độ mờ viền (Backdrop Blur):</label>
+              <input type="range" id="sub-backdrop-blur" min="0" max="16" step="2" value="4" class="w-full accent-indigo-500">
+            </div>
+          </div>
+
+          <!-- Shadow / Outline Toggle -->
+          <div class="flex items-center justify-between pt-1">
+            <span class="text-xs text-slate-300">Đổ bóng chữ đậm (High Contrast Shadow):</span>
+            <input type="checkbox" id="sub-shadow-toggle" checked class="w-4 h-4 rounded accent-indigo-500">
+          </div>
+
+        </div>
+
+        <!-- ============================================================= -->
+        <!-- TAB 4: DANH SÁCH & CHỈNH SỬA ĐOẠN THOẠI (TIMELINE EDITOR)      -->
+        <!-- ============================================================= -->
+        <div id="tab-editor" class="tab-pane hidden space-y-3 flex-1 flex flex-col">
+          
+          <!-- Search & Add Actions -->
+          <div class="flex items-center gap-2">
+            <input type="text" id="segment-search-input" placeholder="Tìm kiếm từ khóa thoại..." class="flex-1 bg-slate-900/90 border border-slate-700/80 rounded-lg px-3 py-1.5 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-indigo-500">
+            <button id="btn-add-segment" class="px-2.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-xs font-semibold rounded-lg text-white transition flex items-center gap-1">
+              <span>+</span> Thêm
+            </button>
+          </div>
+
+          <!-- Editable Segments List Container -->
+          <div id="segment-editor-list" class="space-y-3 overflow-y-auto max-h-[380px] pr-1">
+            <!-- Dynamic segment cards will be populated here -->
+          </div>
+
+        </div>
+
+      </div>
+
+      <!-- ============================================================= -->
+      <!-- BOTTOM ACTION & EXPORT BAR                                    -->
+      <!-- ============================================================= -->
+      <div class="glass-panel rounded-xl p-3 flex flex-wrap items-center justify-between gap-2 border border-slate-800">
+        <span class="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
+          <svg class="w-4 h-4 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+          </svg>
+          Tải Phụ Đề:
+        </span>
+        <div class="flex items-center gap-2">
+          <button id="btn-export-srt" class="px-3 py-1.5 rounded-lg text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-500 transition shadow-sm">
+            .SRT
+          </button>
+          <button id="btn-export-vtt" class="px-3 py-1.5 rounded-lg text-xs font-bold text-slate-200 bg-slate-800 hover:bg-slate-700 border border-slate-700 transition">
+            .VTT
+          </button>
+          <button id="btn-export-json" class="px-3 py-1.5 rounded-lg text-xs font-bold text-slate-300 bg-slate-900 hover:bg-slate-800 border border-slate-800 transition" title="Lưu cấu trúc JSON">
+            .JSON
+          </button>
+        </div>
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- ================================================================= -->
+  <!-- TOAST NOTIFICATIONS CONTAINER                                     -->
+  <!-- ================================================================= -->
+  <div id="toast-container"></div>
+
+  <!-- Scripts -->
+  <script src="gemini-api.js"></script>
+  <script src="dubbing-engine.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

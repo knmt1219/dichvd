@@ -12,8 +12,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const videoWrapper = document.getElementById('video-wrapper');
   const subtitleOverlay = document.getElementById('subtitle-overlay-container');
   const videoFileInput = document.getElementById('video-file-input');
-  const dropzone = document.getElementById('video-dropzone');
   const emptyStatePlaceholder = document.getElementById('empty-video-placeholder');
+  const dragOverlay = document.getElementById('video-drag-overlay');
+  const browseBtnInner = document.getElementById('btn-browse-file-inner');
   const duckingBadge = document.getElementById('ducking-indicator-badge');
 
   // Khởi tạo Engines
@@ -187,9 +188,10 @@ document.addEventListener('DOMContentLoaded', () => {
   function loadVideoFile(file) {
     if (!file) return;
 
-    // Kiểm tra định dạng
-    if (!file.type.startsWith('video/') && !file.name.match(/\.(mp4|webm|mov|mkv)$/i)) {
-      showToast('Vui lòng chọn định dạng tệp video hợp lệ (.mp4, .webm).', 'error');
+    // Kiểm tra định dạng video phong phú
+    const validExtensions = /\.(mp4|webm|mov|mkv|avi|m4v|ts|flv|wmv)$/i;
+    if (!file.type.startsWith('video/') && !file.name.match(validExtensions)) {
+      showToast('Vui lòng chọn định dạng tệp video hợp lệ (.mp4, .webm, .mov, .mkv).', 'error');
       return;
     }
 
@@ -201,39 +203,85 @@ document.addEventListener('DOMContentLoaded', () => {
     video.classList.remove('hidden');
 
     setStep(2);
-    showToast(`Đã tải video: ${file.name} (${(file.size / (1024 * 1024)).toFixed(1)} MB)`, 'success');
+    showToast(`Đã nạp video: ${file.name} (${(file.size / (1024 * 1024)).toFixed(1)} MB)`, 'success');
     renderTimelineTrack();
   }
 
-  // File Input Change
+  // Chọn tệp qua File Input (cả nút trên header và trong dropzone)
   if (videoFileInput) {
     videoFileInput.addEventListener('change', (e) => {
       const file = e.target.files?.[0];
-      if (file) loadVideoFile(file);
+      if (file) {
+        loadVideoFile(file);
+        videoFileInput.value = ''; // Reset để có thể chọn lại cùng 1 file
+      }
     });
   }
 
-  // Drag & Drop
-  if (dropzone) {
-    ['dragenter', 'dragover'].forEach((eventName) => {
-      dropzone.addEventListener(eventName, (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        dropzone.classList.add('dragover');
-      });
+  // Click vào vùng placeholder để mở file picker
+  if (emptyStatePlaceholder) {
+    emptyStatePlaceholder.addEventListener('click', () => {
+      if (videoFileInput) videoFileInput.click();
+    });
+  }
+
+  if (browseBtnInner) {
+    browseBtnInner.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (videoFileInput) videoFileInput.click();
+    });
+  }
+
+  // Ngăn chặn hành vi mặc định của trình duyệt khi kéo thả tệp ra ngoài vùng
+  ['dragenter', 'dragover', 'dragleave', 'drop'].forEach((eventName) => {
+    window.addEventListener(eventName, (e) => {
+      e.preventDefault();
+    });
+  });
+
+  // Kéo & Thả trực tiếp vào khung Video (kể cả khi chưa có hoặc đã có video)
+  let dragCounter = 0;
+
+  if (videoWrapper) {
+    videoWrapper.addEventListener('dragenter', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      dragCounter++;
+      if (dragOverlay) dragOverlay.classList.remove('hidden');
+      videoWrapper.classList.add('ring-4', 'ring-indigo-500/60');
     });
 
-    ['dragleave', 'drop'].forEach((eventName) => {
-      dropzone.addEventListener(eventName, (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        dropzone.classList.remove('dragover');
-      });
+    videoWrapper.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (dragOverlay && dragOverlay.classList.contains('hidden')) {
+        dragOverlay.classList.remove('hidden');
+      }
     });
 
-    dropzone.addEventListener('drop', (e) => {
-      const file = e.dataTransfer?.files?.[0];
-      if (file) loadVideoFile(file);
+    videoWrapper.addEventListener('dragleave', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      dragCounter--;
+      if (dragCounter <= 0) {
+        dragCounter = 0;
+        if (dragOverlay) dragOverlay.classList.add('hidden');
+        videoWrapper.classList.remove('ring-4', 'ring-indigo-500/60');
+      }
+    });
+
+    videoWrapper.addEventListener('drop', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      dragCounter = 0;
+      if (dragOverlay) dragOverlay.classList.add('hidden');
+      videoWrapper.classList.remove('ring-4', 'ring-indigo-500/60');
+
+      const dt = e.dataTransfer;
+      const files = dt?.files;
+      if (files && files.length > 0) {
+        loadVideoFile(files[0]);
+      }
     });
   }
 

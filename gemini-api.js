@@ -214,22 +214,37 @@ class GeminiService {
     onStatusUpdate(`Đang kết nối đến mô hình Gemini (${this.model})...`, 50);
 
     const fullPrompt = `Bạn là một chuyên gia bóc băng âm thanh (Speech-to-Text) và biên dịch phụ đề video hàng đầu.
-Nhiệm vụ:
-1. Lắng nghe toàn bộ âm thanh lời thoại.
-2. Nhận diện giọng nói chính xác từng câu kèm mốc thời gian bắt đầu (start) và kết thúc (end) theo định dạng "HH:MM:SS.mmm" (ví dụ: "00:00:01.200", "00:00:04.500").
-3. Giữ nguyên văn bản gốc trong trường "original".
-4. Dịch toàn bộ nội dung sang ngôn ngữ đích: "${targetLang}". Bản dịch trong trường "translated" phải tự nhiên, gãy gọn, khớp ngữ cảnh và phù hợp để lồng tiếng.
+NHIỆM VỤ CỰC KỲ QUAN TRỌNG:
+1. LẮNG NGHE TOÀN BỘ FILE TỪ GIÂY ĐẦU TIÊN (00:00:00) CHO ĐẾN GIÂY CUỐI CÙNG CỦA TOÀN BỘ VIDEO/AUDIO.
+2. Bóc băng và dịch ĐẦY ĐỦ TẤT CẢ các câu thoại xuyên suốt toàn bộ thời lượng video. TUYỆT ĐỐI KHÔNG ĐƯỢC DỪNG SỚM HOẶC BỎ SÓT BẤT KỲ ĐOẠN THOẠI NÀO.
+3. Chia thành nhiều đoạn nhỏ (mỗi đoạn từ 2 đến 6 giây khớp với từng câu hoặc cụm từ tự nhiên).
+4. Nhận diện giọng nói chính xác từng câu kèm mốc thời gian bắt đầu (start) và kết thúc (end) theo định dạng chuẩn "HH:MM:SS.mmm" (ví dụ: "00:00:01.200", "00:00:04.500").
+5. Giữ nguyên văn bản gốc trong trường "original".
+6. Dịch toàn bộ nội dung sang ngôn ngữ đích: "${targetLang}". Bản dịch trong trường "translated" phải tự nhiên, gãy gọn, khớp ngữ cảnh và phù hợp để lồng tiếng.
 ${customPrompt ? `Yêu cầu thêm từ người dùng: ${customPrompt}` : ''}
 
-QUAN TRỌNG:
-- Trả về DUY NHẤT một mảng JSON (Array of Objects), không kèm bất kỳ văn bản giải thích nào khác.
+QUY TẮC PHẢN HỒI:
+- Trả về DUY NHẤT một mảng JSON (Array of Objects) chứa TOÀN BỘ danh sách tất cả các câu thoại từ đầu đến hết video.
+- Không thêm bất kỳ lời chào, lời giải thích hay markdown nào ngoài JSON.
 - Cấu trúc mẫu chuẩn:
 [
   {
     "start": "00:00:00.500",
     "end": "00:00:03.200",
-    "original": "Text heard from speech",
-    "translated": "Bản dịch sang ${targetLang}"
+    "original": "Sentence 1 heard from speech",
+    "translated": "Câu dịch 1 sang ${targetLang}"
+  },
+  {
+    "start": "00:00:03.500",
+    "end": "00:00:07.100",
+    "original": "Sentence 2 heard from speech",
+    "translated": "Câu dịch 2 sang ${targetLang}"
+  },
+  {
+    "start": "00:00:07.500",
+    "end": "00:00:11.800",
+    "original": "Sentence 3 heard from speech",
+    "translated": "Câu dịch 3 sang ${targetLang}"
   }
 ]`;
 
@@ -252,7 +267,8 @@ QUAN TRỌNG:
         }
       ],
       generationConfig: {
-        temperature: 0.2,
+        temperature: 0.1,
+        maxOutputTokens: 8192,
         topP: 0.95
       }
     };

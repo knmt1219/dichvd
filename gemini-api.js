@@ -1,8 +1,8 @@
 /**
  * gemini-api.js
  * Module xử lý kết nối Google Gemini API (Multimodal Speech-to-Text & Translation)
- * Tích hợp bộ giải nén Web Audio API (chuyển video sang 16kHz WAV mono siêu nhẹ)
- * Hỗ trợ các model: gemini-3.6-flash, gemini-2.5-flash, gemini-1.5-flash, gemini-2.5-pro, gemini-1.5-pro
+ * Tích hợp bộ giải nén Web Audio API 16kHz WAV mono siêu nhẹ chống lỗi 400
+ * Hỗ trợ các model: gemini-1.5-flash, gemini-2.5-flash, gemini-3.6-flash, gemini-1.5-pro
  */
 
 class GeminiService {
@@ -10,14 +10,14 @@ class GeminiService {
     this.storageKey = 'gemini_studio_api_key';
     this.modelStorageKey = 'gemini_studio_model';
     this.apiKey = this.loadApiKey();
-    this.model = this.loadModel() || 'gemini-3.6-flash';
+    this.model = this.loadModel() || 'gemini-1.5-flash';
   }
 
   /**
    * Lưu API Key vào localStorage
    */
   saveApiKey(key) {
-    this.apiKey = (key || '').trim();
+    this.apiKey = (key || '').trim().replace(/["']/g, '');
     if (this.apiKey) {
       localStorage.setItem(this.storageKey, this.apiKey);
     } else {
@@ -29,24 +29,25 @@ class GeminiService {
    * Tải API Key từ localStorage
    */
   loadApiKey() {
-    return localStorage.getItem(this.storageKey) || '';
+    const key = localStorage.getItem(this.storageKey) || '';
+    return key.trim().replace(/["']/g, '');
   }
 
   /**
    * Lưu Model đã chọn
    */
   saveModel(modelName) {
-    this.model = modelName || 'gemini-3.6-flash';
+    this.model = modelName || 'gemini-1.5-flash';
     localStorage.setItem(this.modelStorageKey, this.model);
   }
 
   /**
-   * Tải Model đã lưu (Tự động nâng cấp nếu đang dùng model cũ gemini-2.0-flash)
+   * Tải Model đã lưu
    */
   loadModel() {
     let saved = localStorage.getItem(this.modelStorageKey);
     if (!saved || saved === 'gemini-2.0-flash') {
-      saved = 'gemini-3.6-flash';
+      saved = 'gemini-1.5-flash';
       localStorage.setItem(this.modelStorageKey, saved);
     }
     return saved;
@@ -67,7 +68,9 @@ class GeminiService {
       onProgress('Đang trích xuất luồng âm thanh thoại...', 25);
       const AudioCtx = window.AudioContext || window.webkitAudioContext;
       const audioCtx = new AudioCtx();
-      const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+      
+      // Sử dụng slice(0) để tránh detach ArrayBuffer
+      const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer.slice(0));
 
       onProgress('Đang tối ưu hóa âm thanh (16kHz WAV Mono)...', 35);
       const targetSampleRate = 16000;
@@ -85,7 +88,6 @@ class GeminiService {
       const renderedBuffer = await offlineCtx.startRendering();
       const channelData = renderedBuffer.getChannelData(0);
 
-      // Đóng AudioContext để giải phóng RAM
       if (audioCtx.state !== 'closed') {
         audioCtx.close();
       }
@@ -109,8 +111,8 @@ class GeminiService {
       view.setUint32(4, 36 + dataSize, true);
       writeStr(8, 'WAVE');
       writeStr(12, 'fmt ');
-      view.setUint32(16, 16, true); // Subchunk1Size (16 for PCM)
-      view.setUint16(20, 1, true);  // AudioFormat (1 for PCM)
+      view.setUint32(16, 16, true);
+      view.setUint16(20, 1, true); // PCM format
       view.setUint16(22, numChannels, true);
       view.setUint32(24, targetSampleRate, true);
       view.setUint32(28, targetSampleRate * numChannels * bytesPerSample, true);
@@ -129,8 +131,8 @@ class GeminiService {
       const wavBlob = new Blob([view], { type: 'audio/wav' });
       return await this.blobToBase64(wavBlob, 'audio/wav');
     } catch (audioErr) {
-      console.warn('Trích xuất Web Audio không thành công, chuyển sang gửi trực tiếp tệp gốc:', audioErr);
-      onProgress('Đang chuyển đổi tệp gốc sang Base64...', 30);
+      console.warn('Không thể trích xuất Web Audio, chuyển sang đọc tệp trực tiếp:', audioErr);
+      onProgress('Đang đọc tệp video trực tiếp...', 30);
       return await this.fileToBase64(file);
     }
   }
@@ -203,25 +205,31 @@ class GeminiService {
       onStatusUpdate(msg, pct);
     });
 
+    // Kiểm tra kích thước payload Base64 (tránh quá giới hạn 20MB)
+    const payloadSizeMB = (base64Data.length * 0.75) / (1024 * 1024);
+    if (payloadSizeMB > 19) {
+      throw new Error(`Dữ liệu gửi lên quá lớn (${payloadSizeMB.toFixed(1)}MB > 20MB limit của Gemini). Vui lòng cắt ngắn video dưới 5 phút.`);
+    }
+
     onStatusUpdate(`Đang kết nối đến mô hình Gemini (${this.model})...`, 50);
 
-    const fullPrompt = `Bạn là một chuyên gia bóc băng âm thanh (Speech-to-Text) và biên dịch phụ đề video hàng đầu thế giới.
-Nhiệm vụ của bạn:
-1. Lắng nghe thật kỹ toàn bộ âm thanh/lời thoại trong tệp âm thanh này.
+    const fullPrompt = `Bạn là một chuyên gia bóc băng âm thanh (Speech-to-Text) và biên dịch phụ đề video hàng đầu.
+Nhiệm vụ:
+1. Lắng nghe toàn bộ âm thanh lời thoại.
 2. Nhận diện giọng nói chính xác từng câu kèm mốc thời gian bắt đầu (start) và kết thúc (end) theo định dạng "HH:MM:SS.mmm" (ví dụ: "00:00:01.200", "00:00:04.500").
 3. Giữ nguyên văn bản gốc trong trường "original".
 4. Dịch toàn bộ nội dung sang ngôn ngữ đích: "${targetLang}". Bản dịch trong trường "translated" phải tự nhiên, gãy gọn, khớp ngữ cảnh và phù hợp để lồng tiếng.
 ${customPrompt ? `Yêu cầu thêm từ người dùng: ${customPrompt}` : ''}
 
 QUAN TRỌNG:
-- Trả về DUY NHẤT một mảng JSON (Array of Objects), không kèm lời mở đầu, không kèm lời kết, không giải thích.
+- Trả về DUY NHẤT một mảng JSON (Array of Objects), không kèm bất kỳ văn bản giải thích nào khác.
 - Cấu trúc mẫu chuẩn:
 [
   {
     "start": "00:00:00.500",
     "end": "00:00:03.200",
-    "original": "Text heard from audio",
-    "translated": "Nội dung dịch sang ${targetLang}"
+    "original": "Text heard from speech",
+    "translated": "Bản dịch sang ${targetLang}"
   }
 ]`;
 
@@ -230,14 +238,13 @@ QUAN TRỌNG:
     const requestBody = {
       contents: [
         {
-          role: 'user',
           parts: [
             {
               text: fullPrompt
             },
             {
-              inlineData: {
-                mimeType: mimeType,
+              inline_data: {
+                mime_type: mimeType,
                 data: base64Data
               }
             }
@@ -269,16 +276,20 @@ QUAN TRỌNG:
       let errorDetail = '';
       try {
         const errorJson = await response.json();
-        errorDetail = errorJson.error?.message || JSON.stringify(errorJson);
+        if (errorJson.error) {
+          errorDetail = errorJson.error.message || JSON.stringify(errorJson.error);
+        } else {
+          errorDetail = JSON.stringify(errorJson);
+        }
       } catch (e) {
         errorDetail = await response.text();
       }
 
-      // Tự động xử lý nếu model bị 404
-      if (response.status === 404 && this.model !== 'gemini-3.6-flash') {
-        console.warn(`Mô hình ${this.model} không còn khả dụng (404). Đang tự động chuyển sang gemini-3.6-flash...`);
-        this.saveModel('gemini-3.6-flash');
-        onStatusUpdate('Mô hình cũ không khả dụng, đang tự động chuyển sang Gemini 3.6 Flash...', 50);
+      // Tự động xử lý nếu model bị 404 hoặc không khả dụng
+      if (response.status === 404 && this.model !== 'gemini-1.5-flash') {
+        console.warn(`Mô hình ${this.model} không còn khả dụng (404). Đang tự động chuyển sang gemini-1.5-flash...`);
+        this.saveModel('gemini-1.5-flash');
+        onStatusUpdate('Đang tự động chuyển sang Gemini 1.5 Flash...', 50);
         return this.transcribeAndTranslate({ file, targetLang, customPrompt, onStatusUpdate });
       }
 
@@ -316,12 +327,10 @@ QUAN TRỌNG:
 
   /**
    * Bóc tách JSON an toàn từ phản hồi text
-   * Xử lý trường hợp có markdown fences hoặc ký tự lạ
    */
   parseJsonSafely(rawText) {
     let cleanText = rawText.trim();
 
-    // Loại bỏ markdown code fence ```json ... ``` nếu có
     if (cleanText.startsWith('```json')) {
       cleanText = cleanText.substring(7);
     } else if (cleanText.startsWith('```')) {
@@ -332,11 +341,9 @@ QUAN TRỌNG:
     }
     cleanText = cleanText.trim();
 
-    // Thử parse trực tiếp
     try {
       return JSON.parse(cleanText);
     } catch (err1) {
-      // Nếu thất bại, tìm mảng JSON [ ... ] bên trong văn bản
       const arrayMatch = cleanText.match(/\[[\s\S]*\]/);
       if (arrayMatch) {
         try {
@@ -350,7 +357,7 @@ QUAN TRỌNG:
   }
 
   /**
-   * Chuẩn hóa danh sách segment để đảm bảo đầy đủ các trường start, end, original, translated
+   * Chuẩn hóa danh sách segment
    */
   normalizeSegments(segments) {
     return segments.map((item, index) => {

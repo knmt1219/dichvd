@@ -1,8 +1,8 @@
 /**
  * dubbing-engine.js
  * Module quản lý:
- * 1. Subtitle Sync Engine: Đồng bộ phụ đề theo thời gian video, tùy biến giao diện, xuất SRT/VTT.
- * 2. AI Dubbing Engine: Phát giọng đọc Text-to-Speech (Web Speech API) và hiệu ứng Audio Ducking.
+ * 1. Subtitle Sync Engine: Đồng bộ phụ đề theo thời gian video, tùy biến giao diện, dải che phụ đề gốc (Hardsub Mask), xuất SRT/VTT.
+ * 2. AI Dubbing Engine: Phát giọng đọc Text-to-Speech (Web Speech API), Audio Ducking, chống nghẽn giọng Chrome và bù trừ thời gian (Timing Offset).
  */
 
 // ==========================================
@@ -73,15 +73,16 @@ class TimeUtils {
 }
 
 // ==========================================
-// SUBTITLE SYNC ENGINE
+// SUBTITLE SYNC ENGINE & HARDSUB MASK
 // ==========================================
 class SubtitleEngine {
-  constructor(overlayContainerElement) {
+  constructor(overlayContainerElement, maskBarElement = null) {
     this.container = overlayContainerElement;
+    this.maskElement = maskBarElement;
     this.segments = [];
     this.activeSegment = null;
 
-    // Cài đặt phong cách hiển thị mặc định
+    // Cài đặt phong cách hiển thị phụ đề mặc định
     this.styles = {
       position: 'bottom', // 'bottom', 'bottom-higher', 'middle', 'top'
       fontSize: 22, // px
@@ -90,14 +91,27 @@ class SubtitleEngine {
       backdropBlur: 4, // px
       textShadow: true,
       displayMode: 'both', // 'both', 'translated-only', 'original-only'
-      dualLayout: 'stacked' // 'stacked' (translated to hơn, original nhỏ hơn ở trên)
+      dualLayout: 'stacked'
+    };
+
+    // Cài đặt dải che / đè phụ đề gốc (Hardsub Mask)
+    this.maskSettings = {
+      enabled: false,
+      mode: 'always', // 'always' (luôn hiển thị suốt video) hoặc 'active-only' (chỉ hiện khi có phụ đề)
+      height: 60, // px
+      bottom: 6,  // %
+      width: 100, // %
+      color: '#000000',
+      opacity: 1.0,
+      blur: 0
     };
 
     this.applyStyles();
+    this.applyMaskSettings();
   }
 
   /**
-   * Cập nhật danh sách segments và tính toán số giây sẵn sàng cho sync tốc độ cao
+   * Cập nhật danh sách segments
    */
   setSegments(rawSegments) {
     this.segments = (rawSegments || []).map((seg, idx) => {
@@ -118,27 +132,63 @@ class SubtitleEngine {
   }
 
   /**
-   * Cập nhật tùy biến kiểu dáng phụ đề
+   * Cập nhật kiểu dáng phụ đề
    */
   updateStyles(newStyles) {
     this.styles = { ...this.styles, ...newStyles };
     this.applyStyles();
-    // Render lại phụ đề hiện tại nếu đang hiển thị
     if (this.activeSegment) {
       this.displaySubtitle(this.activeSegment);
     }
   }
 
   /**
-   * Áp dụng vị trí và container style
+   * Cập nhật cài đặt dải che phụ đề gốc (Hardsub Mask)
+   */
+  updateMaskSettings(newMaskSettings) {
+    this.maskSettings = { ...this.maskSettings, ...newMaskSettings };
+    this.applyMaskSettings();
+  }
+
+  /**
+   * Áp dụng dải che phụ đề gốc lên DOM
+   */
+  applyMaskSettings() {
+    if (!this.maskElement) return;
+
+    if (!this.maskSettings.enabled) {
+      this.maskElement.style.display = 'none';
+      return;
+    }
+
+    if (this.maskSettings.mode === 'always') {
+      this.maskElement.style.display = 'block';
+    } else {
+      this.maskElement.style.display = this.activeSegment ? 'block' : 'none';
+    }
+
+    this.maskElement.style.height = `${this.maskSettings.height}px`;
+    this.maskElement.style.bottom = `${this.maskSettings.bottom}%`;
+    this.maskElement.style.width = `${this.maskSettings.width}%`;
+    this.maskElement.style.backgroundColor = this.maskSettings.color;
+    this.maskElement.style.opacity = this.maskSettings.opacity;
+    if (this.maskSettings.blur > 0) {
+      this.maskElement.style.backdropFilter = `blur(${this.maskSettings.blur}px)`;
+      this.maskElement.style.webkitBackdropFilter = `blur(${this.maskSettings.blur}px)`;
+    } else {
+      this.maskElement.style.backdropFilter = 'none';
+      this.maskElement.style.webkitBackdropFilter = 'none';
+    }
+  }
+
+  /**
+   * Áp dụng vị trí và container style cho phụ đề
    */
   applyStyles() {
     if (!this.container) return;
 
-    // Xóa các class vị trí cũ
     this.container.classList.remove('sub-pos-bottom', 'sub-pos-bottom-higher', 'sub-pos-middle', 'sub-pos-top');
 
-    // Gán class vị trí mới
     switch (this.styles.position) {
       case 'top':
         this.container.classList.add('sub-pos-top');
@@ -157,7 +207,7 @@ class SubtitleEngine {
   }
 
   /**
-   * Bắt sự kiện thời gian video để render phụ đề tức thì
+   * Bắt sự kiện thời gian video để render phụ đề và cập nhật dải che
    */
   updateTime(currentTime) {
     if (!this.segments || this.segments.length === 0) {
@@ -165,7 +215,6 @@ class SubtitleEngine {
       return null;
     }
 
-    // Tìm segment đang rơi vào khoảng thời gian hiện tại
     const current = this.segments.find(
       (s) => currentTime >= s.startSec && currentTime <= s.endSec
     );
@@ -174,11 +223,17 @@ class SubtitleEngine {
       if (this.activeSegment?.id !== current.id) {
         this.activeSegment = current;
         this.displaySubtitle(current);
+        if (this.maskSettings.enabled && this.maskSettings.mode === 'active-only') {
+          if (this.maskElement) this.maskElement.style.display = 'block';
+        }
       }
       return current;
     } else {
       if (this.activeSegment) {
         this.clearSubtitle();
+        if (this.maskSettings.enabled && this.maskSettings.mode === 'active-only') {
+          if (this.maskElement) this.maskElement.style.display = 'none';
+        }
       }
       return null;
     }
@@ -194,28 +249,32 @@ class SubtitleEngine {
 
     let contentHtml = '';
     const shadowStyle = textShadow
-      ? 'text-shadow: 0 2px 4px rgba(0,0,0,0.9), 0 0 2px #000;'
+      ? 'text-shadow: 0 2px 4px rgba(0,0,0,0.95), 0 0 2px #000;'
       : '';
 
     const showOriginal = (displayMode === 'both' || displayMode === 'original-only') && segment.original;
     const showTranslated = (displayMode === 'both' || displayMode === 'translated-only') && segment.translated;
 
+    // Nếu dải che phụ đề gốc đang bật, nền phụ đề có thể để trong suốt nhẹ
+    const effectiveBg = this.maskSettings.enabled ? 'transparent' : bgColor;
+    const effectiveBlur = this.maskSettings.enabled ? 0 : backdropBlur;
+
     if (showOriginal && showTranslated) {
       contentHtml = `
-        <div class="subtitle-box" style="background-color: ${bgColor}; backdrop-filter: blur(${backdropBlur}px); -webkit-backdrop-filter: blur(${backdropBlur}px); color: ${textColor}; ${shadowStyle}">
-          <span class="subtitle-original-text font-normal opacity-75" style="font-size: ${Math.round(fontSize * 0.75)}px;">${this.escapeHtml(segment.original)}</span>
+        <div class="subtitle-box" style="background-color: ${effectiveBg}; backdrop-filter: blur(${effectiveBlur}px); -webkit-backdrop-filter: blur(${effectiveBlur}px); color: ${textColor}; ${shadowStyle}">
+          <span class="subtitle-original-text font-normal opacity-80" style="font-size: ${Math.round(fontSize * 0.72)}px;">${this.escapeHtml(segment.original)}</span>
           <span class="subtitle-translated-text font-bold" style="font-size: ${fontSize}px;">${this.escapeHtml(segment.translated)}</span>
         </div>
       `;
     } else if (showTranslated) {
       contentHtml = `
-        <div class="subtitle-box" style="background-color: ${bgColor}; backdrop-filter: blur(${backdropBlur}px); -webkit-backdrop-filter: blur(${backdropBlur}px); color: ${textColor}; ${shadowStyle}">
+        <div class="subtitle-box" style="background-color: ${effectiveBg}; backdrop-filter: blur(${effectiveBlur}px); -webkit-backdrop-filter: blur(${effectiveBlur}px); color: ${textColor}; ${shadowStyle}">
           <span class="subtitle-translated-text font-bold" style="font-size: ${fontSize}px;">${this.escapeHtml(segment.translated)}</span>
         </div>
       `;
     } else if (showOriginal) {
       contentHtml = `
-        <div class="subtitle-box" style="background-color: ${bgColor}; backdrop-filter: blur(${backdropBlur}px); -webkit-backdrop-filter: blur(${backdropBlur}px); color: ${textColor}; ${shadowStyle}">
+        <div class="subtitle-box" style="background-color: ${effectiveBg}; backdrop-filter: blur(${effectiveBlur}px); -webkit-backdrop-filter: blur(${effectiveBlur}px); color: ${textColor}; ${shadowStyle}">
           <span class="subtitle-translated-text font-bold" style="font-size: ${fontSize}px;">${this.escapeHtml(segment.original)}</span>
         </div>
       `;
@@ -317,7 +376,7 @@ class SubtitleEngine {
 }
 
 // ==========================================
-// AI DUBBING ENGINE & AUDIO DUCKING
+// AI DUBBING ENGINE & AUDIO DUCKING & FIX LỖI
 // ==========================================
 class DubbingEngine {
   constructor(videoElement, onDuckingChange = () => {}) {
@@ -332,11 +391,12 @@ class DubbingEngine {
       enabled: true,
       voiceURI: null,
       lang: 'vi-VN',
-      volume: 1.0, // 0.0 - 1.0
-      rate: 1.0,   // 0.5 - 2.0 (tốc độ đọc)
-      pitch: 1.0,  // 0.5 - 1.5
+      volume: 1.0,         // 0.0 - 1.0 (âm lượng giọng đọc)
+      rate: 1.0,           // 0.5 - 2.0 (tốc độ đọc)
+      pitch: 1.0,          // 0.5 - 1.5 (cao độ)
+      timingOffset: 0.0,   // -1.0s đến +1.0s (bù trừ độ trễ lồng tiếng)
       duckingEnabled: true,
-      duckingRatio: 0.25, // Hạ âm lượng video gốc còn 25% khi có thuyết minh
+      duckingRatio: 0.25,  // Hạ âm lượng video gốc còn 25% khi có thuyết minh
       originalVideoVolume: 1.0 // Âm lượng cơ sở của video
     };
 
@@ -345,6 +405,19 @@ class DubbingEngine {
     this.activeUtterance = null;
 
     this.initVoices();
+    this.startKeepAlive();
+  }
+
+  /**
+   * Fix lỗi Chrome SpeechSynthesis bị đơ / treo sau 15 giây
+   */
+  startKeepAlive() {
+    setInterval(() => {
+      if (this.synth && this.synth.speaking) {
+        this.synth.pause();
+        this.synth.resume();
+      }
+    }, 5000);
   }
 
   /**
@@ -360,6 +433,18 @@ class DubbingEngine {
     if (this.synth && this.synth.onvoiceschanged !== undefined) {
       this.synth.onvoiceschanged = load;
     }
+  }
+
+  /**
+   * Khởi động lại toàn bộ Engine giọng đọc khi bị lỗi
+   */
+  resetEngine() {
+    this.stopSpeaking(true);
+    if (this.synth) {
+      this.synth.cancel();
+      if (this.synth.resume) this.synth.resume();
+    }
+    this.initVoices();
   }
 
   /**
@@ -388,7 +473,7 @@ class DubbingEngine {
   }
 
   /**
-   * Gọi khi video phát và đồng bộ từng mốc thoại
+   * Đồng bộ giọng đọc khi video chạy
    */
   onTimeUpdate(currentTime, activeSegment) {
     if (!this.config.enabled || !activeSegment || !activeSegment.translated) {
@@ -403,16 +488,21 @@ class DubbingEngine {
   }
 
   /**
-   * Phát giọng đọc cho đoạn thoại
+   * Phát giọng đọc cho đoạn thoại (kèm xử lý an toàn chống nghẽn)
    */
   speakSegment(segment) {
     if (!this.synth || !this.config.enabled) return;
 
-    // Hủy phát âm thanh trước đó nếu còn đang nói
+    // Luôn hủy phát âm thanh trước đó để tránh nói chồng câu
     this.stopSpeaking(false);
 
     const textToSpeak = segment.translated || segment.original;
     if (!textToSpeak) return;
+
+    // Đảm bảo synth không bị pause ngầm
+    if (this.synth.paused) {
+      this.synth.resume();
+    }
 
     const utterance = new SpeechSynthesisUtterance(textToSpeak);
     utterance.volume = Math.max(0, Math.min(1, this.config.volume));
@@ -428,12 +518,11 @@ class DubbingEngine {
       if (matchingVoices.length > 0) utterance.voice = matchingVoices[0];
     }
 
-    // Bắt sự kiện bắt đầu phát -> Kích hoạt Audio Ducking
+    // Kích hoạt Audio Ducking
     utterance.onstart = () => {
       this.applyAudioDucking(true);
     };
 
-    // Khi kết thúc phát hoặc gặp lỗi -> Tắt Audio Ducking
     utterance.onend = () => {
       this.applyAudioDucking(false);
       this.activeUtterance = null;
@@ -446,7 +535,17 @@ class DubbingEngine {
     };
 
     this.activeUtterance = utterance;
-    this.synth.speak(utterance);
+
+    // Độ trễ điều chỉnh nếu có
+    if (this.config.timingOffset && this.config.timingOffset > 0) {
+      setTimeout(() => {
+        if (this.synth && this.activeUtterance === utterance) {
+          this.synth.speak(utterance);
+        }
+      }, Math.round(this.config.timingOffset * 1000));
+    } else {
+      this.synth.speak(utterance);
+    }
   }
 
   /**
@@ -464,17 +563,15 @@ class DubbingEngine {
     }
 
     if (enable) {
-      // Giảm âm lượng video gốc
       const targetVolume = this.config.originalVideoVolume * this.config.duckingRatio;
       this.video.volume = Math.max(0, Math.min(1, targetVolume));
     } else {
-      // Khôi phục âm lượng video gốc
       this.video.volume = Math.max(0, Math.min(1, this.config.originalVideoVolume));
     }
   }
 
   /**
-   * Dừng phát giọng đọc (khi pause, seek hoặc đổi segment)
+   * Dừng phát giọng đọc
    */
   stopSpeaking(resetSegmentId = true) {
     if (this.synth) {
@@ -495,7 +592,7 @@ class DubbingEngine {
       throw new Error('Trình duyệt của bạn không hỗ trợ Web Speech API.');
     }
 
-    this.stopSpeaking(true);
+    this.resetEngine();
 
     const utterance = new SpeechSynthesisUtterance(sampleText);
     utterance.volume = this.config.volume;

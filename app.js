@@ -15,10 +15,11 @@ document.addEventListener('DOMContentLoaded', () => {
   const emptyStatePlaceholder = document.getElementById('empty-video-placeholder');
   const dragOverlay = document.getElementById('video-drag-overlay');
   const browseBtnInner = document.getElementById('btn-browse-file-inner');
+  const hardsubMaskBar = document.getElementById('hardsub-mask-bar');
   const duckingBadge = document.getElementById('ducking-indicator-badge');
 
   // Khởi tạo Engines
-  const subtitleEngine = new SubtitleEngine(subtitleOverlay);
+  const subtitleEngine = new SubtitleEngine(subtitleOverlay, hardsubMaskBar);
   const dubbingEngine = new DubbingEngine(video, (isDucking) => {
     if (duckingBadge) {
       if (isDucking) {
@@ -502,6 +503,76 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
+  // Tùy biến Dải Che / Đè Phụ Đề Gốc (Hardsub Mask)
+  const maskEnableToggle = document.getElementById('mask-enable-toggle');
+  const maskControlsWrapper = document.getElementById('mask-controls-wrapper');
+  const maskModeSelect = document.getElementById('mask-mode-select');
+  const maskHeightSlider = document.getElementById('mask-height-slider');
+  const maskHeightVal = document.getElementById('mask-height-val');
+  const maskBottomSlider = document.getElementById('mask-bottom-slider');
+  const maskBottomVal = document.getElementById('mask-bottom-val');
+  const maskWidthSlider = document.getElementById('mask-width-slider');
+  const maskWidthVal = document.getElementById('mask-width-val');
+  const maskOpacitySlider = document.getElementById('mask-opacity-slider');
+  const maskOpacityVal = document.getElementById('mask-opacity-val');
+  const maskColorPicker = document.getElementById('mask-color-picker');
+
+  if (maskEnableToggle) {
+    maskEnableToggle.addEventListener('change', (e) => {
+      const enabled = e.target.checked;
+      subtitleEngine.updateMaskSettings({ enabled });
+      if (maskControlsWrapper) {
+        if (enabled) maskControlsWrapper.classList.remove('hidden');
+        else maskControlsWrapper.classList.add('hidden');
+      }
+      showToast(enabled ? 'Đã bật dải che đè phụ đề gốc!' : 'Đã tắt dải che.', 'info');
+    });
+  }
+
+  if (maskModeSelect) {
+    maskModeSelect.addEventListener('change', (e) => {
+      subtitleEngine.updateMaskSettings({ mode: e.target.value });
+    });
+  }
+
+  if (maskHeightSlider) {
+    maskHeightSlider.addEventListener('input', (e) => {
+      const height = parseInt(e.target.value, 10);
+      if (maskHeightVal) maskHeightVal.textContent = `${height}px`;
+      subtitleEngine.updateMaskSettings({ height });
+    });
+  }
+
+  if (maskBottomSlider) {
+    maskBottomSlider.addEventListener('input', (e) => {
+      const bottom = parseInt(e.target.value, 10);
+      if (maskBottomVal) maskBottomVal.textContent = `${bottom}%`;
+      subtitleEngine.updateMaskSettings({ bottom });
+    });
+  }
+
+  if (maskWidthSlider) {
+    maskWidthSlider.addEventListener('input', (e) => {
+      const width = parseInt(e.target.value, 10);
+      if (maskWidthVal) maskWidthVal.textContent = `${width}%`;
+      subtitleEngine.updateMaskSettings({ width });
+    });
+  }
+
+  if (maskOpacitySlider) {
+    maskOpacitySlider.addEventListener('input', (e) => {
+      const opacity = parseFloat(e.target.value);
+      if (maskOpacityVal) maskOpacityVal.textContent = `${Math.round(opacity * 100)}%`;
+      subtitleEngine.updateMaskSettings({ opacity });
+    });
+  }
+
+  if (maskColorPicker) {
+    maskColorPicker.addEventListener('input', (e) => {
+      subtitleEngine.updateMaskSettings({ color: e.target.value });
+    });
+  }
+
   // ===================================================
   // 10. MODULE 3: LỒNG TIẾNG (AI DUBBING & AUDIO DUCKING)
   // ===================================================
@@ -514,7 +585,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const originalVolumeSlider = document.getElementById('original-volume-slider');
   const voiceRateSlider = document.getElementById('voice-rate-slider');
   const voiceRateVal = document.getElementById('voice-rate-val');
+  const voiceOffsetSlider = document.getElementById('voice-offset-slider');
+  const voiceOffsetVal = document.getElementById('voice-offset-val');
   const testVoiceBtn = document.getElementById('btn-test-voice');
+  const resetTtsBtn = document.getElementById('btn-reset-tts');
 
   function populateVoiceList(langCode) {
     if (!voiceSelect) return;
@@ -608,6 +682,14 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  if (voiceOffsetSlider) {
+    voiceOffsetSlider.addEventListener('input', (e) => {
+      const offset = parseFloat(e.target.value);
+      if (voiceOffsetVal) voiceOffsetVal.textContent = `${offset > 0 ? '+' : ''}${offset.toFixed(1)}s`;
+      dubbingEngine.updateConfig({ timingOffset: offset });
+    });
+  }
+
   if (testVoiceBtn) {
     testVoiceBtn.addEventListener('click', () => {
       try {
@@ -617,6 +699,16 @@ document.addEventListener('DOMContentLoaded', () => {
       } catch (err) {
         showToast(err.message, 'error');
       }
+    });
+  }
+
+  if (resetTtsBtn) {
+    resetTtsBtn.addEventListener('click', () => {
+      dubbingEngine.resetEngine();
+      const targetLang = targetLanguageSelect ? targetLanguageSelect.value : 'Tiếng Việt';
+      const langCode = langCodeMap[targetLang] || 'vi-VN';
+      populateVoiceList(langCode);
+      showToast('Đã khởi động lại bộ đọc TTS thành công!', 'success');
     });
   }
 

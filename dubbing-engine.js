@@ -2,7 +2,7 @@
  * dubbing-engine.js
  * Module quản lý:
  * 1. Subtitle Sync Engine: Đồng bộ phụ đề theo thời gian video, tùy biến giao diện, dải che phụ đề gốc (Hardsub Mask), xuất SRT/VTT.
- * 2. AI Dubbing Engine: Phát giọng đọc Text-to-Speech (Web Speech API), Audio Ducking, chống nghẽn giọng Chrome và bù trừ thời gian (Timing Offset).
+ * 2. AI Dubbing Engine: Tích hợp ĐA NGUỒN GIỌNG ĐỌC (Online Tiếng Việt Chuẩn Tự Nhiên + Web Speech API Trình Duyệt), Audio Ducking, chống nghẽn giọng và bù trừ thời gian.
  */
 
 // ==========================================
@@ -97,7 +97,7 @@ class SubtitleEngine {
     // Cài đặt dải che / đè phụ đề gốc (Hardsub Mask)
     this.maskSettings = {
       enabled: false,
-      mode: 'always', // 'always' (luôn hiển thị suốt video) hoặc 'active-only' (chỉ hiện khi có phụ đề)
+      mode: 'always', // 'always' hoặc 'active-only'
       height: 60, // px
       bottom: 6,  // %
       width: 100, // %
@@ -110,9 +110,6 @@ class SubtitleEngine {
     this.applyMaskSettings();
   }
 
-  /**
-   * Cập nhật danh sách segments
-   */
   setSegments(rawSegments) {
     this.segments = (rawSegments || []).map((seg, idx) => {
       const startSec = TimeUtils.timeToSeconds(seg.start);
@@ -131,9 +128,6 @@ class SubtitleEngine {
     this.clearSubtitle();
   }
 
-  /**
-   * Cập nhật kiểu dáng phụ đề
-   */
   updateStyles(newStyles) {
     this.styles = { ...this.styles, ...newStyles };
     this.applyStyles();
@@ -142,17 +136,11 @@ class SubtitleEngine {
     }
   }
 
-  /**
-   * Cập nhật cài đặt dải che phụ đề gốc (Hardsub Mask)
-   */
   updateMaskSettings(newMaskSettings) {
     this.maskSettings = { ...this.maskSettings, ...newMaskSettings };
     this.applyMaskSettings();
   }
 
-  /**
-   * Áp dụng dải che phụ đề gốc lên DOM
-   */
   applyMaskSettings() {
     if (!this.maskElement) return;
 
@@ -181,9 +169,6 @@ class SubtitleEngine {
     }
   }
 
-  /**
-   * Áp dụng vị trí và container style cho phụ đề
-   */
   applyStyles() {
     if (!this.container) return;
 
@@ -206,9 +191,6 @@ class SubtitleEngine {
     }
   }
 
-  /**
-   * Bắt sự kiện thời gian video để render phụ đề và cập nhật dải che
-   */
   updateTime(currentTime) {
     if (!this.segments || this.segments.length === 0) {
       this.clearSubtitle();
@@ -239,9 +221,6 @@ class SubtitleEngine {
     }
   }
 
-  /**
-   * Hiển thị HTML phụ đề
-   */
   displaySubtitle(segment) {
     if (!this.container) return;
 
@@ -255,7 +234,6 @@ class SubtitleEngine {
     const showOriginal = (displayMode === 'both' || displayMode === 'original-only') && segment.original;
     const showTranslated = (displayMode === 'both' || displayMode === 'translated-only') && segment.translated;
 
-    // Nếu dải che phụ đề gốc đang bật, nền phụ đề có thể để trong suốt nhẹ
     const effectiveBg = this.maskSettings.enabled ? 'transparent' : bgColor;
     const effectiveBlur = this.maskSettings.enabled ? 0 : backdropBlur;
 
@@ -283,9 +261,6 @@ class SubtitleEngine {
     this.container.innerHTML = contentHtml;
   }
 
-  /**
-   * Xóa khung phụ đề khi không có thoại
-   */
   clearSubtitle() {
     this.activeSegment = null;
     if (this.container) {
@@ -293,9 +268,6 @@ class SubtitleEngine {
     }
   }
 
-  /**
-   * Xuất file .SRT chuẩn phụ đề
-   */
   exportSRT(filename = 'subtitles.srt') {
     if (!this.segments || this.segments.length === 0) {
       throw new Error('Chưa có phụ đề để xuất file.');
@@ -315,9 +287,6 @@ class SubtitleEngine {
     this.downloadFile(srtContent, filename, 'text/plain;charset=utf-8');
   }
 
-  /**
-   * Xuất file .VTT (WebVTT)
-   */
   exportVTT(filename = 'subtitles.vtt') {
     if (!this.segments || this.segments.length === 0) {
       throw new Error('Chưa có phụ đề để xuất file.');
@@ -337,9 +306,6 @@ class SubtitleEngine {
     this.downloadFile(vttContent, filename, 'text/vtt;charset=utf-8');
   }
 
-  /**
-   * Xuất file JSON lưu trữ
-   */
   exportJSON(filename = 'subtitles_data.json') {
     if (!this.segments || this.segments.length === 0) {
       throw new Error('Chưa có phụ đề để xuất file.');
@@ -349,9 +315,6 @@ class SubtitleEngine {
     this.downloadFile(data, filename, 'application/json;charset=utf-8');
   }
 
-  /**
-   * Helper kích hoạt tải file trên trình duyệt
-   */
   downloadFile(content, fileName, contentType) {
     const blob = new Blob([content], { type: contentType });
     const url = URL.createObjectURL(blob);
@@ -375,9 +338,9 @@ class SubtitleEngine {
   }
 }
 
-// ==========================================
-// AI DUBBING ENGINE & AUDIO DUCKING & FIX LỖI
-// ==========================================
+// ===================================================
+// AI DUBBING ENGINE (ĐA NGUỒN: ONLINE CHUẨN + TRÌNH DUYỆT)
+// ===================================================
 class DubbingEngine {
   constructor(videoElement, onDuckingChange = () => {}) {
     this.video = videoElement;
@@ -386,26 +349,50 @@ class DubbingEngine {
     this.synth = window.speechSynthesis;
     this.availableVoices = [];
 
+    // Audio element phát giọng đọc Tiếng Việt Online chất lượng cao
+    this.audioPlayer = new Audio();
+    this.audioPlayer.crossOrigin = 'anonymous';
+
     // Cài đặt mặc định
     this.config = {
       enabled: true,
-      voiceURI: null,
+      voiceURI: 'online-vi', // 'online-vi' (Mặc định: Giọng Tiếng Việt chuẩn tự nhiên)
+      engineType: 'online',  // 'online' hoặc 'native'
       lang: 'vi-VN',
-      volume: 1.0,         // 0.0 - 1.0 (âm lượng giọng đọc)
-      rate: 1.0,           // 0.5 - 2.0 (tốc độ đọc)
-      pitch: 1.0,          // 0.5 - 1.5 (cao độ)
-      timingOffset: 0.0,   // -1.0s đến +1.0s (bù trừ độ trễ lồng tiếng)
+      volume: 1.0,           // 0.0 - 1.0 (âm lượng giọng đọc)
+      rate: 1.0,             // 0.5 - 2.0 (tốc độ đọc)
+      pitch: 1.0,            // 0.5 - 1.5 (cao độ)
+      timingOffset: 0.0,     // -1.0s đến +1.0s (bù trừ độ trễ)
       duckingEnabled: true,
-      duckingRatio: 0.25,  // Hạ âm lượng video gốc còn 25% khi có thuyết minh
-      originalVideoVolume: 1.0 // Âm lượng cơ sở của video
+      duckingRatio: 0.25,    // Hạ âm lượng video gốc còn 25% khi có thuyết minh
+      originalVideoVolume: 1.0
     };
 
     this.lastSpokenSegmentId = null;
     this.isDucking = false;
     this.activeUtterance = null;
 
+    this.initAudioPlayerEvents();
     this.initVoices();
     this.startKeepAlive();
+  }
+
+  /**
+   * Bắt sự kiện Audio Player của Giọng đọc Online
+   */
+  initAudioPlayerEvents() {
+    this.audioPlayer.onplay = () => {
+      this.applyAudioDucking(true);
+    };
+
+    this.audioPlayer.onended = () => {
+      this.applyAudioDucking(false);
+    };
+
+    this.audioPlayer.onerror = (e) => {
+      console.warn('Audio Player gặp lỗi, chuyển sang Web Speech API:', e);
+      this.applyAudioDucking(false);
+    };
   }
 
   /**
@@ -436,7 +423,7 @@ class DubbingEngine {
   }
 
   /**
-   * Khởi động lại toàn bộ Engine giọng đọc khi bị lỗi
+   * Khởi động lại toàn bộ Engine giọng đọc
    */
   resetEngine() {
     this.stopSpeaking(true);
@@ -444,25 +431,66 @@ class DubbingEngine {
       this.synth.cancel();
       if (this.synth.resume) this.synth.resume();
     }
+    if (this.audioPlayer) {
+      this.audioPlayer.pause();
+      this.audioPlayer.src = '';
+    }
     this.initVoices();
   }
 
   /**
-   * Lấy danh sách giọng đọc theo mã ngôn ngữ
+   * Lấy danh sách giọng đọc tổng hợp (bao gồm Giọng Online chuẩn + Giọng Trình Duyệt)
    */
-  getVoicesForLanguage(langCode) {
+  getVoicesForLanguage(langCode = 'vi-VN') {
     if (!this.availableVoices || this.availableVoices.length === 0) {
       this.availableVoices = this.synth?.getVoices() || [];
     }
 
-    if (!langCode) return this.availableVoices;
+    const isVietnamese = !langCode || langCode.toLowerCase().startsWith('vi');
 
-    const shortCode = langCode.split('-')[0].toLowerCase();
+    const voiceList = [];
+
+    // Luôn đưa Giọng Online Tiếng Việt Chuẩn lên vị trí số 1 cho người dùng Tiếng Việt
+    if (isVietnamese) {
+      voiceList.push({
+        voiceURI: 'online-vi',
+        name: '🌟 Giọng Tiếng Việt Tự Nhiên (Online Chuẩn Phát Âm)',
+        lang: 'vi-VN',
+        isOnline: true,
+        default: true
+      });
+    }
+
+    // Các giọng trình duyệt khớp mã ngôn ngữ
+    const shortCode = (langCode || 'vi').split('-')[0].toLowerCase();
     const matching = this.availableVoices.filter(
       (v) => v.lang.toLowerCase().startsWith(shortCode) || v.lang.toLowerCase().includes(shortCode)
     );
 
-    return matching.length > 0 ? matching : this.availableVoices;
+    matching.forEach((v) => {
+      voiceList.push({
+        voiceURI: v.voiceURI,
+        name: `💻 ${v.name} (${v.lang})`,
+        lang: v.lang,
+        isOnline: false,
+        default: false
+      });
+    });
+
+    // Nếu không có giọng trình duyệt nào khớp, đưa các giọng mặc định khác vào để lựa chọn
+    if (matching.length === 0 && this.availableVoices.length > 0) {
+      this.availableVoices.slice(0, 8).forEach((v) => {
+        voiceList.push({
+          voiceURI: v.voiceURI,
+          name: `💻 ${v.name} (${v.lang})`,
+          lang: v.lang,
+          isOnline: false,
+          default: false
+        });
+      });
+    }
+
+    return voiceList;
   }
 
   /**
@@ -480,7 +508,6 @@ class DubbingEngine {
       return;
     }
 
-    // Nếu vừa bước vào một segment mới chưa được đọc
     if (this.lastSpokenSegmentId !== activeSegment.id) {
       this.lastSpokenSegmentId = activeSegment.id;
       this.speakSegment(activeSegment);
@@ -488,37 +515,84 @@ class DubbingEngine {
   }
 
   /**
-   * Phát giọng đọc cho đoạn thoại (kèm xử lý an toàn chống nghẽn)
+   * Phát giọng đọc cho đoạn thoại
    */
   speakSegment(segment) {
-    if (!this.synth || !this.config.enabled) return;
+    if (!this.config.enabled) return;
 
-    // Luôn hủy phát âm thanh trước đó để tránh nói chồng câu
     this.stopSpeaking(false);
 
     const textToSpeak = segment.translated || segment.original;
     if (!textToSpeak) return;
 
-    // Đảm bảo synth không bị pause ngầm
+    const delayMs = Math.max(0, Math.round((this.config.timingOffset || 0) * 1000));
+
+    // Kiểm tra xem đang dùng Giọng Online hay Giọng Trình Duyệt
+    const useOnline = this.config.voiceURI === 'online-vi' || 
+      (this.config.lang && this.config.lang.startsWith('vi') && (!this.config.voiceURI || this.config.voiceURI === 'online-vi'));
+
+    if (useOnline) {
+      setTimeout(() => {
+        this.speakOnlineTTS(textToSpeak);
+      }, delayMs);
+    } else {
+      setTimeout(() => {
+        this.speakNativeTTS(textToSpeak);
+      }, delayMs);
+    }
+  }
+
+  /**
+   * Phát giọng đọc Online Tiếng Việt Chuẩn (Google Neural TTS Audio Stream)
+   */
+  speakOnlineTTS(text) {
+    try {
+      const cleanText = text.replace(/[\r\n]+/g, ' ').trim().slice(0, 300);
+      const targetLangShort = this.config.lang ? this.config.lang.split('-')[0] : 'vi';
+      const audioUrl = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(cleanText)}&tl=${targetLangShort}&client=tw-ob`;
+
+      this.audioPlayer.src = audioUrl;
+      this.audioPlayer.volume = Math.max(0, Math.min(1, this.config.volume));
+      this.audioPlayer.playbackRate = Math.max(0.6, Math.min(1.8, this.config.rate));
+
+      const playPromise = this.audioPlayer.play();
+      if (playPromise !== undefined) {
+        playPromise.catch((err) => {
+          console.warn('Audio play bị chặn hoặc lỗi mạng, chuyển sang Web Speech:', err);
+          this.speakNativeTTS(text);
+        });
+      }
+    } catch (e) {
+      this.speakNativeTTS(text);
+    }
+  }
+
+  /**
+   * Phát giọng đọc Trình Duyệt Cục Bộ (Web Speech API)
+   */
+  speakNativeTTS(text) {
+    if (!this.synth) return;
+
     if (this.synth.paused) {
       this.synth.resume();
     }
 
-    const utterance = new SpeechSynthesisUtterance(textToSpeak);
+    const utterance = new SpeechSynthesisUtterance(text);
     utterance.volume = Math.max(0, Math.min(1, this.config.volume));
     utterance.rate = Math.max(0.5, Math.min(2.0, this.config.rate));
     utterance.pitch = Math.max(0.5, Math.min(1.5, this.config.pitch));
 
-    // Tìm voice phù hợp
-    if (this.config.voiceURI) {
+    // Tìm voice theo URI đã chọn
+    if (this.config.voiceURI && this.config.voiceURI !== 'online-vi') {
       const selected = this.availableVoices.find((v) => v.voiceURI === this.config.voiceURI);
       if (selected) utterance.voice = selected;
     } else if (this.config.lang) {
-      const matchingVoices = this.getVoicesForLanguage(this.config.lang);
+      const matchingVoices = this.availableVoices.filter(
+        (v) => v.lang.toLowerCase().startsWith(this.config.lang.split('-')[0].toLowerCase())
+      );
       if (matchingVoices.length > 0) utterance.voice = matchingVoices[0];
     }
 
-    // Kích hoạt Audio Ducking
     utterance.onstart = () => {
       this.applyAudioDucking(true);
     };
@@ -535,17 +609,7 @@ class DubbingEngine {
     };
 
     this.activeUtterance = utterance;
-
-    // Độ trễ điều chỉnh nếu có
-    if (this.config.timingOffset && this.config.timingOffset > 0) {
-      setTimeout(() => {
-        if (this.synth && this.activeUtterance === utterance) {
-          this.synth.speak(utterance);
-        }
-      }, Math.round(this.config.timingOffset * 1000));
-    } else {
-      this.synth.speak(utterance);
-    }
+    this.synth.speak(utterance);
   }
 
   /**
@@ -571,11 +635,15 @@ class DubbingEngine {
   }
 
   /**
-   * Dừng phát giọng đọc
+   * Dừng phát giọng đọc (cả Online Audio và Native Synth)
    */
   stopSpeaking(resetSegmentId = true) {
     if (this.synth) {
       this.synth.cancel();
+    }
+    if (this.audioPlayer) {
+      this.audioPlayer.pause();
+      this.audioPlayer.currentTime = 0;
     }
     this.activeUtterance = null;
     this.applyAudioDucking(false);
@@ -587,27 +655,14 @@ class DubbingEngine {
   /**
    * Phát thử giọng đọc đã cấu hình
    */
-  testVoice(sampleText = 'Xin chào, đây là giọng thuyết minh AI thử nghiệm.') {
-    if (!this.synth) {
-      throw new Error('Trình duyệt của bạn không hỗ trợ Web Speech API.');
+  testVoice(sampleText = 'Xin chào, đây là giọng đọc tiếng Việt thử nghiệm của studio.') {
+    this.stopSpeaking(true);
+
+    if (this.config.voiceURI === 'online-vi' || (this.config.lang && this.config.lang.startsWith('vi') && (!this.config.voiceURI || this.config.voiceURI === 'online-vi'))) {
+      this.speakOnlineTTS(sampleText);
+    } else {
+      this.speakNativeTTS(sampleText);
     }
-
-    this.resetEngine();
-
-    const utterance = new SpeechSynthesisUtterance(sampleText);
-    utterance.volume = this.config.volume;
-    utterance.rate = this.config.rate;
-    utterance.pitch = this.config.pitch;
-
-    if (this.config.voiceURI) {
-      const selected = this.availableVoices.find((v) => v.voiceURI === this.config.voiceURI);
-      if (selected) utterance.voice = selected;
-    } else if (this.config.lang) {
-      const matchingVoices = this.getVoicesForLanguage(this.config.lang);
-      if (matchingVoices.length > 0) utterance.voice = matchingVoices[0];
-    }
-
-    this.synth.speak(utterance);
   }
 }
 

@@ -450,14 +450,35 @@ class DubbingEngine {
 
     const voiceList = [];
 
-    // Luôn đưa Giọng Online Tiếng Việt Chuẩn lên vị trí số 1 cho người dùng Tiếng Việt
+    // Danh sách giọng đọc Tiếng Việt Neural như người thật
     if (isVietnamese) {
       voiceList.push({
         voiceURI: 'online-vi',
-        name: '🌟 Giọng Tiếng Việt Tự Nhiên (Online Chuẩn Phát Âm)',
+        name: '🌟 Giọng Nữ Hoài My (Truyền cảm, chuẩn phát thanh viên)',
         lang: 'vi-VN',
         isOnline: true,
         default: true
+      });
+      voiceList.push({
+        voiceURI: 'online-vi-male',
+        name: '🌟 Giọng Nam Nam Minh (Trầm ấm, review phim / tài liệu)',
+        lang: 'vi-VN',
+        isOnline: true,
+        default: false
+      });
+      voiceList.push({
+        voiceURI: 'online-vi-southern',
+        name: '🌟 Giọng Nữ Mai Phương (Miền Nam ngọt ngào, tự nhiên)',
+        lang: 'vi-VN',
+        isOnline: true,
+        default: false
+      });
+      voiceList.push({
+        voiceURI: 'online-vi-google',
+        name: '🌟 Google Neural Tiếng Việt (Tự nhiên & Chuẩn âm)',
+        lang: 'vi-VN',
+        isOnline: true,
+        default: false
       });
     }
 
@@ -477,7 +498,6 @@ class DubbingEngine {
       });
     });
 
-    // Nếu không có giọng trình duyệt nào khớp, đưa các giọng mặc định khác vào để lựa chọn
     if (matching.length === 0 && this.availableVoices.length > 0) {
       this.availableVoices.slice(0, 8).forEach((v) => {
         voiceList.push({

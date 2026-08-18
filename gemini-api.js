@@ -213,38 +213,31 @@ class GeminiService {
 
     onStatusUpdate(`Đang kết nối đến mô hình Gemini (${this.model})...`, 50);
 
-    const fullPrompt = `Bạn là một chuyên gia bóc băng âm thanh (Speech-to-Text) và biên dịch phụ đề video hàng đầu.
-NHIỆM VỤ CỰC KỲ QUAN TRỌNG:
-1. LẮNG NGHE TOÀN BỘ FILE TỪ GIÂY ĐẦU TIÊN (00:00:00) CHO ĐẾN GIÂY CUỐI CÙNG CỦA TOÀN BỘ VIDEO/AUDIO.
-2. Bóc băng và dịch ĐẦY ĐỦ TẤT CẢ các câu thoại xuyên suốt toàn bộ thời lượng video. TUYỆT ĐỐI KHÔNG ĐƯỢC DỪNG SỚM HOẶC BỎ SÓT BẤT KỲ ĐOẠN THOẠI NÀO.
-3. Chia thành nhiều đoạn nhỏ (mỗi đoạn từ 2 đến 6 giây khớp với từng câu hoặc cụm từ tự nhiên).
-4. Nhận diện giọng nói chính xác từng câu kèm mốc thời gian bắt đầu (start) và kết thúc (end) theo định dạng chuẩn "HH:MM:SS.mmm" (ví dụ: "00:00:01.200", "00:00:04.500").
-5. Giữ nguyên văn bản gốc trong trường "original".
-6. Dịch toàn bộ nội dung sang ngôn ngữ đích: "${targetLang}". Bản dịch trong trường "translated" phải tự nhiên, gãy gọn, khớp ngữ cảnh và phù hợp để lồng tiếng.
+    const fullPrompt = `Bạn là chuyên gia bóc băng âm thanh (Verbatim Speech-to-Text) và chuyển ngữ kịch bản lồng tiếng video điện ảnh hàng đầu.
+
+YÊU CẦU BẮT BUỘC (TUYỆT ĐỐI TUÂN THỦ):
+1. BÓC BĂNG NGUYÊN VĂN 100% (FULL VERBATIM): Lắng nghe kỹ lưỡng từ giây đầu tiên (00:00:00) đến tận giây cuối cùng của video. Ghi lại TOÀN BỘ mọi câu nói, lời thoại chính, lời dẫn, lời thoại nền, câu cảm thán, câu ngắn mà KHÔNG ĐƯỢC TÓM TẮT hay BỎ SÓT bất kỳ câu nào.
+2. CHIA ĐOẠN KHỚP NHỊP NÓI: Chia video thành các đoạn thoại ngắn và vừa (từ 1.5 đến 5.5 giây mỗi đoạn) bám sát đúng từng hơi thở và nhịp ngắt câu của người nói.
+3. TIMESTAMP CHUẨN XÁC: Ghi đúng thời gian bắt đầu (start) và kết thúc (end) theo định dạng "HH:MM:SS.mmm" (ví dụ: "00:00:01.200", "00:00:04.500").
+4. DỊCH THUẬT SIÊU TỰ NHIÊN NHƯ NGƯỜI THẬT: Dịch toàn bộ nội dung sang "${targetLang}". Bản dịch trong "translated" phải mang văn phong nói tự nhiên, mượt mà, giàu cảm xúc, hợp ngữ cảnh đời thực, dùng từ ngữ gãy gọn, giàu nhạc điệu để khi lồng tiếng lên nghe hoàn toàn như người thật nói chuyện.
 ${customPrompt ? `Yêu cầu thêm từ người dùng: ${customPrompt}` : ''}
 
 QUY TẮC PHẢN HỒI:
-- Trả về DUY NHẤT một mảng JSON (Array of Objects) chứa TOÀN BỘ danh sách tất cả các câu thoại từ đầu đến hết video.
-- Không thêm bất kỳ lời chào, lời giải thích hay markdown nào ngoài JSON.
+- Trả về DUY NHẤT một mảng JSON (Array of Objects) chứa toàn bộ danh sách câu thoại từ đầu đến hết video.
+- Không kèm bất kỳ lời chào, lời giải thích hay markdown nào ngoài JSON.
 - Cấu trúc mẫu chuẩn:
 [
   {
     "start": "00:00:00.500",
     "end": "00:00:03.200",
     "original": "Sentence 1 heard from speech",
-    "translated": "Câu dịch 1 sang ${targetLang}"
+    "translated": "Câu dịch 1 cực kỳ tự nhiên sang ${targetLang}"
   },
   {
-    "start": "00:00:03.500",
-    "end": "00:00:07.100",
+    "start": "00:00:03.400",
+    "end": "00:00:06.800",
     "original": "Sentence 2 heard from speech",
-    "translated": "Câu dịch 2 sang ${targetLang}"
-  },
-  {
-    "start": "00:00:07.500",
-    "end": "00:00:11.800",
-    "original": "Sentence 3 heard from speech",
-    "translated": "Câu dịch 3 sang ${targetLang}"
+    "translated": "Câu dịch 2 chuẩn xác và mượt mà sang ${targetLang}"
   }
 ]`;
 

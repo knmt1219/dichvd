@@ -152,7 +152,7 @@ document.addEventListener('DOMContentLoaded', () => {
     apiKeyInput.value = window.geminiService.apiKey || '';
   }
   if (modelSelect) {
-    modelSelect.value = window.geminiService.model || 'gemini-2.0-flash';
+    modelSelect.value = window.geminiService.model || 'gemini-3.6-flash';
   }
 
   if (saveKeyBtn && apiKeyInput) {

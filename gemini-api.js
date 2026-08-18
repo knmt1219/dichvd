@@ -1,7 +1,7 @@
 /**
  * gemini-api.js
  * Module xử lý kết nối Google Gemini API (Multimodal Speech-to-Text & Translation)
- * Hỗ trợ các model: gemini-2.0-flash, gemini-1.5-flash, gemini-2.5-flash, gemini-1.5-pro
+ * Hỗ trợ các model: gemini-3.6-flash, gemini-2.5-flash, gemini-1.5-flash, gemini-2.5-pro, gemini-1.5-pro
  */
 
 class GeminiService {
@@ -9,7 +9,7 @@ class GeminiService {
     this.storageKey = 'gemini_studio_api_key';
     this.modelStorageKey = 'gemini_studio_model';
     this.apiKey = this.loadApiKey();
-    this.model = this.loadModel() || 'gemini-2.0-flash';
+    this.model = this.loadModel() || 'gemini-3.6-flash';
   }
 
   /**
@@ -35,15 +35,20 @@ class GeminiService {
    * Lưu Model đã chọn
    */
   saveModel(modelName) {
-    this.model = modelName || 'gemini-2.0-flash';
+    this.model = modelName || 'gemini-3.6-flash';
     localStorage.setItem(this.modelStorageKey, this.model);
   }
 
   /**
-   * Tải Model đã lưu
+   * Tải Model đã lưu (Tự động nâng cấp nếu đang dùng model cũ gemini-2.0-flash)
    */
   loadModel() {
-    return localStorage.getItem(this.modelStorageKey) || 'gemini-2.0-flash';
+    let saved = localStorage.getItem(this.modelStorageKey);
+    if (!saved || saved === 'gemini-2.0-flash') {
+      saved = 'gemini-3.6-flash';
+      localStorage.setItem(this.modelStorageKey, saved);
+    }
+    return saved;
   }
 
   /**
@@ -178,6 +183,14 @@ QUAN TRỌNG:
         errorDetail = errorJson.error?.message || JSON.stringify(errorJson);
       } catch (e) {
         errorDetail = await response.text();
+      }
+
+      // Nếu model trả về 404 (do model cũ bị Google ngừng hỗ trợ), tự động chuyển sang gemini-3.6-flash
+      if (response.status === 404 && this.model !== 'gemini-3.6-flash') {
+        console.warn(`Mô hình ${this.model} không còn khả dụng (404). Đang tự động chuyển sang gemini-3.6-flash...`);
+        this.saveModel('gemini-3.6-flash');
+        onStatusUpdate('Mô hình cũ không khả dụng, đang tự động chuyển sang Gemini 3.6 Flash...', 45);
+        return this.transcribeAndTranslate({ file, targetLang, customPrompt, onStatusUpdate });
       }
 
       if (response.status === 400 && errorDetail.includes('API_KEY_INVALID')) {
